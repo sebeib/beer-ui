@@ -1,34 +1,33 @@
-#FROM node:17-alpine as builder
-#WORKDIR /app
-#COPY package.json .
-#COPY yarn.lock .
-#RUN yarn install
-#COPY . .
-#RUN yarn build
+FROM node:14-alpine AS builder
+ENV NODE_ENV production
 
-#FROM nginx:1.19.0
-#WORKDIR /usr/share/nginx/html
-#RUN rm -fr ./*
-#COPY --from=builder /app/build .
-#ENTRYPOINT ["nginx", "-g", "deamon off;"]
+# Add a work directory
+WORKDIR /app
 
-
-
-# Fetching the latest node image on alpine linux
-FROM node:alpine AS development
-
-# Declaring env
-ENV NODE_ENV development
-
-# Setting up the work directory
-WORKDIR /react-app
-
-# Installing dependencies
-COPY ./package.json /react-app
+# Cache and Install dependencies
+COPY package.json .
+#COPY package-lock.json .
 RUN npm install
-
-# Copying all the files in our project
+RUN npm link styled-components
+RUN npm link typescript
+# Copy app files
 COPY . .
 
-# Starting our application
-CMD npm start
+# Build the app
+RUN npm run build
+
+# Bundle static assets with nginx
+FROM nginx:1.21.0-alpine as production
+ENV NODE_ENV production
+
+# Copy built assets from builder
+COPY --from=builder /app/build /usr/share/nginx/html
+
+# Add your nginx.conf
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+# Expose port
+EXPOSE 80
+
+# Start nginx
+CMD ["nginx", "-g", "daemon off;"]
